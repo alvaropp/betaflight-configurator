@@ -147,34 +147,26 @@ TABS.logging.initialize = function (callback) {
             }
         });
 
-        var motor_speed = 1000;
-        var motor_speed_min = 1000;
-        var motor_speed_max = 1100;
-        var motor_sweep_sense = 1;
-        var motor_sweep_delay = 50;
+        var motor_speed = 1050;
+        var motor_speed_min = 1050;
+        var motor_speed_max = 1250;
+        var motor_sweep_number = 0;
+        var motor_sweep_repeats = 5;
+        var motor_sweep_delay = 100;
+
         function motorSweep() {
             setTimeout(function () {
                 $('div.sliders input.master').val(motor_speed);
                 $('div.sliders input:not(:disabled, :last)').val(motor_speed);
                 $('div.values li:not(:last)').slice(0, number_of_valid_outputs).text(motor_speed);
                 $('div.sliders input:not(:last):first').trigger('input');
-                if (motor_sweep_sense == 1) {
-                    motor_speed++;
-                    if (motor_speed < motor_speed_max) {
-                        motorSweep();
-                    } else {
-                        motor_sweep_sense = -1;
-                        motorSweep();
-                    }
-                }
-                else {
-                    motor_speed--;
-                    if (motor_speed >= motor_speed_min) {
-                        motorSweep();
-                    } else {
-                        motor_sweep_sense = 1;
-                        GUI.log(i18n.getMessage('motorSweepEnd'));
-                    }
+                motor_speed++;
+                if (motor_sweep_number < motor_sweep_repeats && motor_speed < motor_speed_max) {
+                    motorSweep();
+                } else {
+                    motor_speed = motor_speed_min;
+                    motor_sweep_number++;
+                    motorSweep();
                 }
             }, motor_sweep_delay)
         };
