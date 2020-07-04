@@ -2632,6 +2632,13 @@
     "motorSweep": {
         "message": "Start Motor Sweep"
     },
+    "motorSweepStart": {
+        "message": "<strong>Motor sweep started</strong>"
+    },
+    "motorSweepEnd": {
+        "message": "<strong>Motor sweep ended</strong>"
+    },
+    
     "loggingErrorNotConnected": {
         "message": "You need to <strong>connect</strong> first"
     },

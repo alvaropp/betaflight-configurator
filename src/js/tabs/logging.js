@@ -142,14 +142,42 @@ TABS.logging.initialize = function (callback) {
         //////////////////////////////////////////////////////////////// 
         $('a.motor_sweep').click(function () {
             if ($('#motorsEnableTestMode').is(':checked')) {
-                GUI.log("Starting sweep...");
-                var val = 1010;
-                $('div.sliders input.master').val(val);
-                $('div.sliders input:not(:disabled, :last)').val(val);
-                $('div.values li:not(:last)').slice(0, number_of_valid_outputs).text(val);
-                $('div.sliders input:not(:last):first').trigger('input');
+                GUI.log(i18n.getMessage('motorSweepStart'));
+                motorSweep();
             }
         });
+
+        var motor_speed = 1000;
+        var motor_speed_min = 1000;
+        var motor_speed_max = 1100;
+        var motor_sweep_sense = 1;
+        var motor_sweep_delay = 50;
+        function motorSweep() {
+            setTimeout(function () {
+                $('div.sliders input.master').val(motor_speed);
+                $('div.sliders input:not(:disabled, :last)').val(motor_speed);
+                $('div.values li:not(:last)').slice(0, number_of_valid_outputs).text(motor_speed);
+                $('div.sliders input:not(:last):first').trigger('input');
+                if (motor_sweep_sense == 1) {
+                    motor_speed++;
+                    if (motor_speed < motor_speed_max) {
+                        motorSweep();
+                    } else {
+                        motor_sweep_sense = -1;
+                        motorSweep();
+                    }
+                }
+                else {
+                    motor_speed--;
+                    if (motor_speed >= motor_speed_min) {
+                        motorSweep();
+                    } else {
+                        motor_sweep_sense = 1;
+                        GUI.log(i18n.getMessage('motorSweepEnd'));
+                    }
+                }
+            }, motor_sweep_delay)
+        };
         //////////////////////////////////////////////////////////////// 
 
         $('a.logging').click(function () {
