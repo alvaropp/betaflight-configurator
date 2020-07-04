@@ -422,6 +422,35 @@ progress[value]::-webkit-progress-bar {
     color: white;
 }
 
+.tab-logging .plot_control {
+    background-color: #393b3a;
+}
+
+.tab-logging .plot_control select {
+  background-color: #3a3a3a;
+  color: white;
+}
+
+.tab-logging .motorblock {
+    background-color: #393b3a;
+}
+
+.tab-logging .m-block {
+    background-color: #393b3a;
+}
+
+.tab-logging .m-block .label {
+    color: white;
+}
+
+.tab-logging .m-block .meter-bar {
+    background-color: #393b3a;
+}
+
+.tab-logging .motor_testing .notice {
+    background-color: #4e4e4e;
+}
+
 
 /* MOTORS TAB */
 
