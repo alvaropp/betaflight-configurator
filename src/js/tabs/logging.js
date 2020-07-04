@@ -110,6 +110,8 @@ TABS.logging.initialize = function (callback) {
         self.armed = bit_check(CONFIG.mode, 0);
     }
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     function process_html() {
         // translate to user-selected language
         i18n.localizePage();
@@ -136,6 +138,19 @@ TABS.logging.initialize = function (callback) {
         }
 
         $('a.log_file').click(prepare_file);
+
+        //////////////////////////////////////////////////////////////// 
+        $('a.motor_sweep').click(function () {
+            if ($('#motorsEnableTestMode').is(':checked')) {
+                GUI.log("Starting sweep...");
+                var val = 1010;
+                $('div.sliders input.master').val(val);
+                $('div.sliders input:not(:disabled, :last)').val(val);
+                $('div.values li:not(:last)').slice(0, number_of_valid_outputs).text(val);
+                $('div.sliders input:not(:last):first').trigger('input');
+            }
+        });
+        //////////////////////////////////////////////////////////////// 
 
         $('a.logging').click(function () {
             if (GUI.connected_to) {
@@ -371,6 +386,8 @@ TABS.logging.initialize = function (callback) {
 
         GUI.content_ready(callback);
     }
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     function print_head() {
         var head = "timestamp";

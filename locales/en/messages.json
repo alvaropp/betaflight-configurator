@@ -2629,6 +2629,9 @@
     "loggingBack": {
         "message": "Leave Logging / Disconnect"
     },
+    "motorSweep": {
+        "message": "Start Motor Sweep"
+    },
     "loggingErrorNotConnected": {
         "message": "You need to <strong>connect</strong> first"
     },
