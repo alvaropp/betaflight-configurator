@@ -1,17 +1,89 @@
 'use strict';
 
-TABS.logging = {};
+TABS.logging = {
+    feature3DEnabled: false,
+    escProtocolIsDshot: false,
+    sensor: "gyro",
+    sensorGyroRate: 20,
+    sensorGyroScale: 2000,
+    sensorAccelRate: 20,
+    sensorAccelScale: 2,
+    sensorSelectValues: {
+        "gyroScale": {
+            "10": 10,
+            "25": 25,
+            "50": 50,
+            "100": 100,
+            "200": 200,
+            "300": 300,
+            "400": 400,
+            "500": 500,
+            "1000": 1000,
+            "2000": 2000
+        },
+        "accelScale": {
+            "0.05": 0.05,
+            "0.1": 0.1,
+            "0.2": 0.2,
+            "0.3": 0.3,
+            "0.4": 0.4,
+            "0.5": 0.5,
+            "1": 1,
+            "2": 2
+        }
+    },
+    // These are translated into proper Dshot values on the flight controller
+    DSHOT_DISARMED_VALUE: 1000,
+    DSHOT_MAX_VALUE: 2000,
+    DSHOT_3D_NEUTRAL: 1500
+};
+
 TABS.logging.initialize = function (callback) {
     var self = this;
 
-    if (GUI.active_tab != 'logging') {
-        GUI.active_tab = 'logging';
-    }
+    self.armed = false;
+    self.escProtocolIsDshot = false;
 
     var requested_properties = [],
         samples = 0,
         requests = 0,
         log_buffer = [];
+
+    if (GUI.active_tab != 'logging') {
+        GUI.active_tab = 'logging';
+    }
+
+    function get_arm_status() {
+        MSP.send_message(MSPCodes.MSP_STATUS, false, false, load_feature_config);
+    }
+
+    function load_feature_config() {
+        MSP.send_message(MSPCodes.MSP_FEATURE_CONFIG, false, false, load_motor_3d_config);
+    }
+
+    function load_motor_3d_config() {
+        MSP.send_message(MSPCodes.MSP_MOTOR_3D_CONFIG, false, false, load_esc_protocol);
+    }
+
+    function load_esc_protocol() {
+        MSP.send_message(MSPCodes.MSP_ADVANCED_CONFIG, false, false, load_motor_data);
+    }
+
+    function load_motor_data() {
+        MSP.send_message(MSPCodes.MSP_MOTOR, false, false, load_motor_telemetry_data);
+    }
+
+    function load_motor_telemetry_data() {
+        if (MOTOR_CONFIG.use_dshot_telemetry || MOTOR_CONFIG.use_esc_sensor) {
+            MSP.send_message(MSPCodes.MSP_MOTOR_TELEMETRY, false, false, load_mixer_config);
+        } else {
+            load_mixer_config();
+        }
+    }
+
+    function load_mixer_config() {
+        MSP.send_message(MSPCodes.MSP_MIXER_CONFIG, false, false, load_html);
+    }
 
     if (CONFIGURATOR.connectionValid) {
         var get_motor_data = function () {
@@ -25,11 +97,44 @@ TABS.logging.initialize = function (callback) {
         MSP.send_message(MSPCodes.MSP_RC, false, false, get_motor_data);
     }
 
+    // Get information from Betaflight
+    if (semver.gte(CONFIG.apiVersion, "1.36.0")) {
+        // BF 3.2.0+
+        MSP.send_message(MSPCodes.MSP_MOTOR_CONFIG, false, false, get_arm_status);
+    } else {
+        // BF 3.1.x or older
+        MSP.send_message(MSPCodes.MSP_MISC, false, false, get_arm_status);
+    }
+
+    function update_arm_status() {
+        self.armed = bit_check(CONFIG.mode, 0);
+    }
+
     function process_html() {
         // translate to user-selected language
         i18n.localizePage();
 
+        update_arm_status();
+        self.feature3DEnabled = FEATURE_CONFIG.features.isEnabled('3D');
+
+        if (PID_ADVANCED_CONFIG.fast_pwm_protocol >= TABS.configuration.DSHOT_PROTOCOL_MIN_VALUE) {
+            self.escProtocolIsDshot = true;
+        } else {
+            self.escProtocolIsDshot = false;
+        }
+
         // UI hooks
+        $('#motorsEnableTestMode').prop('checked', false);
+
+        if (semver.lt(CONFIG.apiVersion, "1.42.0") || !(MOTOR_CONFIG.use_dshot_telemetry || MOTOR_CONFIG.use_esc_sensor)) {
+            $(".motor_testing .telemetry").hide();
+        } else {
+            // Hide telemetry from unused motors (to hide the tooltip in an empty blank space)
+            for (let i = MOTOR_CONFIG.motor_count; i < MOTOR_DATA.length; i++) {
+                $(".motor_testing .telemetry .motor-" + i).hide();
+            }
+        }
+
         $('a.log_file').click(prepare_file);
 
         $('a.logging').click(function () {
@@ -108,6 +213,161 @@ TABS.logging.initialize = function (callback) {
                 });
             }
         });
+
+        var number_of_valid_outputs = (MOTOR_DATA.indexOf(0) > -1) ? MOTOR_DATA.indexOf(0) : 8;
+        var rangeMin;
+        var rangeMax;
+        var neutral3d;
+        if (self.escProtocolIsDshot) {
+            rangeMin = self.DSHOT_DISARMED_VALUE;
+            rangeMax = self.DSHOT_MAX_VALUE;
+            neutral3d = self.DSHOT_3D_NEUTRAL;
+        } else {
+            rangeMin = MOTOR_CONFIG.mincommand;
+            rangeMax = MOTOR_CONFIG.maxthrottle;
+            //Arbitrary sanity checks
+            //Note: values may need to be revisited
+            neutral3d = (MOTOR_3D_CONFIG.neutral > 1575 || MOTOR_3D_CONFIG.neutral < 1425) ? 1500 : MOTOR_3D_CONFIG.neutral;
+        }
+
+        $('div.sliders input').prop('min', rangeMin)
+            .prop('max', rangeMax);
+        $('div.values li:not(:last)').text(rangeMin);
+        function setSlidersDefault() {
+            // change all values to default
+            if (self.feature3DEnabled) {
+                $('div.sliders input').val(neutral3d);
+            } else {
+                $('div.sliders input').val(rangeMin);
+            }
+        }
+
+        function setSlidersEnabled(isEnabled) {
+            if (isEnabled && !self.armed) {
+                $('div.sliders input').slice(0, number_of_valid_outputs).prop('disabled', false);
+
+                // unlock master slider
+                $('div.sliders input:last').prop('disabled', false);
+            } else {
+                setSlidersDefault();
+
+                // disable sliders / min max
+                $('div.sliders input').prop('disabled', true);
+            }
+
+            $('div.sliders input').trigger('input');
+        }
+
+        setSlidersDefault();
+
+        $('#motorsEnableTestMode').change(function () {
+            var enabled = $(this).is(':checked');
+
+            setSlidersEnabled(enabled);
+
+            $('div.sliders input').trigger('input');
+
+            mspHelper.setArmingEnabled(enabled, enabled);
+        }).change();
+
+        var buffering_set_motor = [],
+            buffer_delay = false;
+        $('div.sliders input:not(.master)').on('input', function () {
+            var index = $(this).index(),
+                buffer = [];
+
+            $('div.values li').eq(index).text($(this).val());
+
+            for (var i = 0; i < 8; i++) {
+                var val = parseInt($('div.sliders input').eq(i).val());
+                buffer.push16(val);
+            }
+
+            buffering_set_motor.push(buffer);
+
+            if (!buffer_delay) {
+                buffer_delay = setTimeout(function () {
+                    buffer = buffering_set_motor.pop();
+
+                    MSP.send_message(MSPCodes.MSP_SET_MOTOR, buffer);
+
+                    buffering_set_motor = [];
+                    buffer_delay = false;
+                }, 10);
+            }
+        });
+
+        $('div.sliders input.master').on('input', function () {
+            var val = $(this).val();
+
+            $('div.sliders input:not(:disabled, :last)').val(val);
+            $('div.values li:not(:last)').slice(0, number_of_valid_outputs).text(val);
+            $('div.sliders input:not(:last):first').trigger('input');
+        });
+
+        // check if motors are already spinning
+        var motors_running = false;
+
+        for (var i = 0; i < number_of_valid_outputs; i++) {
+            if (!self.feature3DEnabled) {
+                if (MOTOR_DATA[i] > rangeMin) {
+                    motors_running = true;
+                }
+            } else {
+                if ((MOTOR_DATA[i] < MOTOR_3D_CONFIG.deadband3d_low) || (MOTOR_DATA[i] > MOTOR_3D_CONFIG.deadband3d_high)) {
+                    motors_running = true;
+                }
+            }
+        }
+
+        if (motors_running) {
+            $('#motorsEnableTestMode').prop('checked', true).change();
+
+            // motors are running adjust sliders to current values
+
+            var sliders = $('div.sliders input:not(.master)');
+
+            var master_value = MOTOR_DATA[0];
+            for (var i = 0; i < MOTOR_DATA.length; i++) {
+                if (MOTOR_DATA[i] > 0) {
+                    sliders.eq(i).val(MOTOR_DATA[i]);
+
+                    if (master_value != MOTOR_DATA[i]) {
+                        master_value = false;
+                    }
+                }
+            }
+
+            // only fire events when all values are set
+            sliders.trigger('input');
+
+            // slide master slider if condition is valid
+            if (master_value) {
+                $('div.sliders input.master').val(master_value)
+                    .trigger('input');
+            }
+        }
+
+        function get_status() {
+            // status needed for arming flag
+            MSP.send_message(MSPCodes.MSP_STATUS, false, false, get_motor_data);
+        }
+
+        function get_motor_data() {
+            MSP.send_message(MSPCodes.MSP_MOTOR, false, false, get_motor_telemetry_data);
+        }
+
+        function get_motor_telemetry_data() {
+            if (MOTOR_CONFIG.use_dshot_telemetry || MOTOR_CONFIG.use_esc_sensor) {
+                MSP.send_message(MSPCodes.MSP_MOTOR_TELEMETRY, false, false, get_servo_data);
+            } else {
+                get_servo_data();
+            }
+        }
+
+        function get_servo_data() {
+            MSP.send_message(MSPCodes.MSP_SERVO, false, false, update_ui);
+        }
 
         GUI.content_ready(callback);
     }
@@ -229,7 +489,7 @@ TABS.logging.initialize = function (callback) {
         fileWriter = null;
 
     function prepare_file() {
-        
+
         var prefix = 'log';
         var suffix = 'csv';
 
@@ -240,7 +500,7 @@ TABS.logging.initialize = function (callback) {
         }];
 
         // create or load the file
-        chrome.fileSystem.chooseEntry({type: 'saveFile', suggestedName: filename, accepts: accepts}, function(entry) {
+        chrome.fileSystem.chooseEntry({ type: 'saveFile', suggestedName: filename, accepts: accepts }, function (entry) {
             if (!entry) {
                 console.log('No file selected');
                 return;
@@ -249,19 +509,19 @@ TABS.logging.initialize = function (callback) {
             fileEntry = entry;
 
             // echo/console log path specified
-            chrome.fileSystem.getDisplayPath(fileEntry, function(path) {
+            chrome.fileSystem.getDisplayPath(fileEntry, function (path) {
                 console.log('Log file path: ' + path);
             });
 
             // change file entry from read only to read/write
-            chrome.fileSystem.getWritableEntry(fileEntry, function(fileEntryWritable) {
+            chrome.fileSystem.getWritableEntry(fileEntry, function (fileEntryWritable) {
                 // check if file is writable
-                chrome.fileSystem.isWritableEntry(fileEntryWritable, function(isWritable) {
+                chrome.fileSystem.isWritableEntry(fileEntryWritable, function (isWritable) {
                     if (isWritable) {
                         fileEntry = fileEntryWritable;
 
                         // save entry for next use
-                        ConfigStorage.set({'logging_file_entry': chrome.fileSystem.retainEntry(fileEntry)});
+                        ConfigStorage.set({ 'logging_file_entry': chrome.fileSystem.retainEntry(fileEntry) });
 
                         // reset sample counter in UI
                         $('.samples').text(0);
@@ -313,7 +573,7 @@ TABS.logging.initialize = function (callback) {
             fileWriter.seek(fileWriter.length);
         }
 
-        fileWriter.write(new Blob([data + '\n'], {type: 'text/plain'}));
+        fileWriter.write(new Blob([data + '\n'], { type: 'text/plain' }));
     }
 };
 
