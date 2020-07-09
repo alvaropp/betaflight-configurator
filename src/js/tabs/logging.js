@@ -147,9 +147,9 @@ TABS.logging.initialize = function (callback) {
             }
         });
 
-        var motor_speed = 1050;
-        var motor_speed_min = 1050;
-        var motor_speed_max = 1250;
+        var motor_speed = 1100;
+        var motor_speed_min = 1100;
+        var motor_speed_max = 1300;
         var motor_sweep_warmup_tick = 0;
         var motor_sweep_warmup_number_ticks = 1000;
         var motor_sweep_number = 0;
