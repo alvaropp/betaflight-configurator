@@ -149,12 +149,12 @@ TABS.logging.initialize = function (callback) {
 
         var motor_speed = 1100;
         var motor_speed_min = 1100;
-        var motor_speed_max = 1300;
+        var motor_speed_max = 1400;
         var motor_sweep_warmup_tick = 0;
-        var motor_sweep_warmup_number_ticks = 1000;
+        var motor_sweep_warmup_number_ticks = 50;
         var motor_sweep_number = 0;
         var motor_sweep_repeats = 2;
-        var motor_sweep_delay = 20;
+        var motor_sweep_delay = 100;
         var current_motor = 0;
         var number_motors = 4;
 
