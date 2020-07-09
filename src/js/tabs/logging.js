@@ -143,18 +143,53 @@ TABS.logging.initialize = function (callback) {
         $('a.motor_sweep').click(function () {
             if ($('#motorsEnableTestMode').is(':checked')) {
                 GUI.log(i18n.getMessage('motorSweepStart'));
-                motorSweep();
+                motorSweepIndividual();
             }
         });
 
         var motor_speed = 1050;
         var motor_speed_min = 1050;
         var motor_speed_max = 1250;
+        var motor_sweep_warmup = 10000;
         var motor_sweep_number = 0;
-        var motor_sweep_repeats = 5;
-        var motor_sweep_delay = 100;
+        var motor_sweep_repeats = 1;
+        var motor_sweep_delay = 10;
+        var current_motor = 0;
+        var number_motors = 4;
 
-        function motorSweep() {
+        function motorSweepIndividual() {
+            setTimeout(function () {
+                $('div.sliders input.' + current_motor.toString()).val(motor_speed);
+                $('div.values li:eq(' + current_motor.toString() + ')').text(motor_speed);
+                $('div.sliders input:not(:last):first').trigger('input');
+
+                motor_speed++;
+
+                if (motor_speed < motor_speed_max) {
+                    motorSweepIndividual();
+                } else if (motor_sweep_number < motor_sweep_repeats - 1) {
+                    motor_speed = motor_speed_min;
+                    motor_sweep_number++;
+                    motorSweepIndividual();
+                } else if (current_motor < number_motors - 1) {
+                    $('div.sliders input.' + current_motor.toString()).val(1000);
+                    $('div.values li:eq(' + current_motor.toString() + ')').text(1000);
+                    $('div.sliders input:not(:last):first').trigger('input');
+
+                    motor_speed = motor_speed_min;
+                    motor_sweep_number = 0;
+                    current_motor++;
+                    motorSweepIndividual();
+                } else {
+                    $('div.sliders input.' + current_motor.toString()).val(1000);
+                    $('div.values li:eq(' + current_motor.toString() + ')').text(1000);
+                    $('div.sliders input:not(:last):first').trigger('input');
+                    $('#motorsEnableTestMode').trigger("click");
+                }
+            }, motor_sweep_delay)
+        };
+
+        function motorSweepAll() {
             setTimeout(function () {
                 $('div.sliders input.master').val(motor_speed);
                 $('div.sliders input:not(:disabled, :last)').val(motor_speed);
@@ -162,11 +197,11 @@ TABS.logging.initialize = function (callback) {
                 $('div.sliders input:not(:last):first').trigger('input');
                 motor_speed++;
                 if (motor_sweep_number < motor_sweep_repeats && motor_speed < motor_speed_max) {
-                    motorSweep();
+                    motorSweepAll();
                 } else {
                     motor_speed = motor_speed_min;
                     motor_sweep_number++;
-                    motorSweep();
+                    motorSweepAll();
                 }
             }, motor_sweep_delay)
         };
