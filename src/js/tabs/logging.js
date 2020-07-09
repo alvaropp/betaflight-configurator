@@ -150,12 +150,14 @@ TABS.logging.initialize = function (callback) {
         var motor_speed = 1050;
         var motor_speed_min = 1050;
         var motor_speed_max = 1250;
-        var motor_sweep_warmup = 10000;
+        var motor_sweep_warmup_tick = 0;
+        var motor_sweep_warmup_number_ticks = 1000;
         var motor_sweep_number = 0;
-        var motor_sweep_repeats = 1;
-        var motor_sweep_delay = 10;
+        var motor_sweep_repeats = 2;
+        var motor_sweep_delay = 20;
         var current_motor = 0;
         var number_motors = 4;
+
 
         function motorSweepIndividual() {
             setTimeout(function () {
@@ -163,7 +165,11 @@ TABS.logging.initialize = function (callback) {
                 $('div.values li:eq(' + current_motor.toString() + ')').text(motor_speed);
                 $('div.sliders input:not(:last):first').trigger('input');
 
-                motor_speed++;
+                if (motor_sweep_warmup_tick >= motor_sweep_warmup_number_ticks) {
+                    motor_speed++;
+                } else {
+                    motor_sweep_warmup_tick++;
+                }
 
                 if (motor_speed < motor_speed_max) {
                     motorSweepIndividual();
@@ -176,6 +182,7 @@ TABS.logging.initialize = function (callback) {
                     $('div.values li:eq(' + current_motor.toString() + ')').text(1000);
                     $('div.sliders input:not(:last):first').trigger('input');
 
+                    motor_sweep_warmup_tick = 0;
                     motor_speed = motor_speed_min;
                     motor_sweep_number = 0;
                     current_motor++;
